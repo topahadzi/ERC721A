@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
-// ERC721A Contracts v4.1.0
+// ERC721A Contracts v4.1.0 Mod
 // Creator: Chiru Labs
+// Modifier: Wildcats
 
 pragma solidity ^0.8.4;
 
@@ -74,6 +75,12 @@ contract ERC721A is IERC721A {
 
     // The tokenId of the next token to be minted.
     uint256 private _currentIndex;
+    uint256 private _currentIndexCommon;
+    uint256 private _currentIndexRare;
+    uint256 private _currentIndexLegendary;
+    uint256 private totalMintedCommon;
+    uint256 private totalMintedRare;
+    uint256 private totalMintedLegendary;
 
     // The number of tokens burned.
     uint256 private _burnCounter;
@@ -114,7 +121,9 @@ contract ERC721A is IERC721A {
     constructor(string memory name_, string memory symbol_) {
         _name = name_;
         _symbol = symbol_;
-        _currentIndex = _startTokenId();
+        _currentIndexCommon = _startTokenIdCommon();
+        _currentIndexRare = _startTokenIdRare();
+        _currentIndexLegendary = _startTokenIdLegendary();
     }
 
     /**
@@ -124,14 +133,30 @@ contract ERC721A is IERC721A {
     function _startTokenId() internal view virtual returns (uint256) {
         return 0;
     }
-
+    function _startTokenIdCommon() internal view virtual returns (uint256) {
+        return 0;
+    }
+    function _startTokenIdRare() internal view virtual returns (uint256) {
+        return 4551;
+    }
+    function _startTokenIdLegendary() internal view virtual returns (uint256) {
+        return 5531;
+    }
     /**
      * @dev Returns the next token ID to be minted.
      */
     function _nextTokenId() internal view returns (uint256) {
         return _currentIndex;
     }
-
+    function _nextTokenIdCommon() internal view returns (uint256) {
+        return _currentIndexCommon;
+    }
+        function _nextTokenIdRare() internal view returns (uint256) {
+        return _currentIndexRare;
+    }
+        function _nextTokenIdLegendary() internal view returns (uint256) {
+        return _currentIndexLegendary;
+    }
     /**
      * @dev Returns the total number of tokens in existence.
      * Burned tokens will reduce the count.
@@ -141,7 +166,7 @@ contract ERC721A is IERC721A {
         // Counter underflow is impossible as _burnCounter cannot be incremented
         // more than `_currentIndex - _startTokenId()` times.
         unchecked {
-            return _currentIndex - _burnCounter - _startTokenId();
+            return ((_currentIndexCommon - _startTokenIdCommon()) + (_currentIndexRare - _startTokenIdRare()) + (_currentIndexLegendary - _startTokenIdLegendary()))  - _burnCounter;
         }
     }
 
@@ -152,7 +177,7 @@ contract ERC721A is IERC721A {
         // Counter underflow is impossible as _currentIndex does not decrement,
         // and it is initialized to `_startTokenId()`
         unchecked {
-            return _currentIndex - _startTokenId();
+            return ((_currentIndexCommon - _startTokenIdCommon()) + (_currentIndexRare - _startTokenIdRare()) + (_currentIndexLegendary - _startTokenIdLegendary()))  - _startTokenId();
         }
     }
 
@@ -227,8 +252,8 @@ contract ERC721A is IERC721A {
         uint256 curr = tokenId;
 
         unchecked {
-            if (_startTokenId() <= curr)
-                if (curr < _currentIndex) {
+            if (_startTokenIdCommon() <= curr ) 
+                if (curr < _currentIndexCommon && curr >= _startTokenIdCommon() || curr < _currentIndexRare && curr >= _startTokenIdRare() || curr < _currentIndexLegendary && curr >= _startTokenIdLegendary() ) {
                     uint256 packed = _packedOwnerships[curr];
                     // If not burned.
                     if (packed & BITMASK_BURNED == 0) {
@@ -424,15 +449,15 @@ contract ERC721A is IERC721A {
     function _exists(uint256 tokenId) internal view returns (bool) {
         return
             _startTokenId() <= tokenId &&
-            tokenId < _currentIndex && // If within bounds,
+            (tokenId < _currentIndexCommon && tokenId >= _startTokenIdCommon() || tokenId < _currentIndexRare && tokenId >= _startTokenIdRare() || tokenId < _currentIndexLegendary && tokenId >= _startTokenIdLegendary() ) && // If within bounds,
             _packedOwnerships[tokenId] & BITMASK_BURNED == 0; // and not burned.
     }
 
     /**
      * @dev Equivalent to `_safeMint(to, quantity, '')`.
      */
-    function _safeMint(address to, uint256 quantity) internal {
-        _safeMint(to, quantity, '');
+    function _safeMint(address to, uint256 quantity, string memory Type) internal {
+        _safeMint(to, quantity, Type, '');
     }
 
     /**
@@ -451,21 +476,45 @@ contract ERC721A is IERC721A {
     function _safeMint(
         address to,
         uint256 quantity,
+        string memory Type,
         bytes memory _data
     ) internal {
-        _mint(to, quantity);
+        _mint(to, quantity, Type);
 
         unchecked {
             if (to.code.length != 0) {
-                uint256 end = _currentIndex;
-                uint256 index = end - quantity;
-                do {
-                    if (!_checkContractOnERC721Received(address(0), to, index++, _data)) {
-                        revert TransferToNonERC721ReceiverImplementer();
-                    }
-                } while (index < end);
-                // Reentrancy protection.
-                if (_currentIndex != end) revert();
+                if (keccak256(abi.encodePacked(Type)) == keccak256(abi.encodePacked("common"))){ 
+                    uint256 end = _currentIndexCommon;
+                    uint256 index = end - quantity;
+                    do {
+                        if (!_checkContractOnERC721Received(address(0), to, index++, _data)) {
+                            revert TransferToNonERC721ReceiverImplementer();
+                        }
+                    } while (index < end);
+                    // Reentrancy protection.
+                    if (_currentIndexCommon != end) revert();
+                } else if (keccak256(abi.encodePacked(Type)) == keccak256(abi.encodePacked("rare"))) {
+                    uint256 end = _currentIndexRare;
+                    uint256 index = end - quantity;
+                    do {
+                        if (!_checkContractOnERC721Received(address(0), to, index++, _data)) {
+                            revert TransferToNonERC721ReceiverImplementer();
+                        }
+                    } while (index < end);
+                    // Reentrancy protection.
+                    if (_currentIndexRare != end) revert();
+                } else if (keccak256(abi.encodePacked(Type)) == keccak256(abi.encodePacked("rare"))) {
+                    uint256 end = _currentIndexLegendary;
+                    uint256 index = end - quantity;
+                    do {
+                        if (!_checkContractOnERC721Received(address(0), to, index++, _data)) {
+                            revert TransferToNonERC721ReceiverImplementer();
+                        }
+                    } while (index < end);
+                    // Reentrancy protection.
+                    if (_currentIndexLegendary != end) revert();
+                }
+
             }
         }
     }
@@ -480,8 +529,15 @@ contract ERC721A is IERC721A {
      *
      * Emits a {Transfer} event for each mint.
      */
-    function _mint(address to, uint256 quantity) internal {
-        uint256 startTokenId = _currentIndex;
+    function _mint(address to, uint256 quantity, string memory Type) internal {
+        uint256 startTokenId;
+        if (keccak256(abi.encodePacked(Type)) == keccak256(abi.encodePacked("common"))){
+            startTokenId = _currentIndexCommon;
+        }else if (keccak256(abi.encodePacked(Type)) == keccak256(abi.encodePacked("rare"))){
+            startTokenId = _currentIndexRare;
+        }else if (keccak256(abi.encodePacked(Type)) == keccak256(abi.encodePacked("legendary"))){
+            startTokenId = _currentIndexLegendary;
+        }
         if (to == address(0)) revert MintToZeroAddress();
         if (quantity == 0) revert MintZeroQuantity();
 
@@ -513,8 +569,14 @@ contract ERC721A is IERC721A {
             do {
                 emit Transfer(address(0), to, tokenId++);
             } while (tokenId < end);
-
-            _currentIndex = end;
+            if (keccak256(abi.encodePacked(Type)) == keccak256(abi.encodePacked("common"))){
+                _currentIndexCommon = end;
+            }else if (keccak256(abi.encodePacked(Type)) == keccak256(abi.encodePacked("rare"))){
+                _currentIndexRare = end;
+            }else if (keccak256(abi.encodePacked(Type)) == keccak256(abi.encodePacked("legendary"))){
+                _currentIndexLegendary = end;
+            }            
+            // _currentIndex = end;
         }
         _afterTokenTransfers(address(0), to, startTokenId, quantity);
     }
@@ -673,7 +735,7 @@ contract ERC721A is IERC721A {
                 // If the next slot's address is zero and not burned (i.e. packed value is zero).
                 if (_packedOwnerships[nextTokenId] == 0) {
                     // If the next slot is within bounds.
-                    if (nextTokenId != _currentIndex) {
+                    if (nextTokenId != _currentIndexCommon && nextTokenId != _currentIndexRare && nextTokenId != _currentIndexLegendary) {
                         // Initialize the next slot to maintain correctness for `ownerOf(tokenId + 1)`.
                         _packedOwnerships[nextTokenId] = prevOwnershipPacked;
                     }
